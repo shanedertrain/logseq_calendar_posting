@@ -1,0 +1,4 @@
+*.log
+*.pyc
+input/credentials.json
+output/token.json
