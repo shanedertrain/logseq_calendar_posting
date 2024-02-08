@@ -13,8 +13,6 @@ logseq_to_google_calendar_recocurrence_strings = {
     'y': 'YEARLY'
 }
 
-CALENDAR = gc.GoogleCalendar(token_path=cfg.TOKEN_PATH, credentials_path=cfg.CREDENTIALS_PATH)
-
 def format_recurrence_string(recurrence_type, recurrence_period):
     recurrence_rule = f"RRULE:FREQ={recurrence_type}"
 
@@ -38,7 +36,8 @@ def main():
                          recurrence=[ recurrence_rule ] if recurrence_rule is not None else None,
                          reminders={'useDefault': False, 'overrides': [{'method': 'popup', 'minutes': 10}]})
 
-        success, message = CALENDAR.create_event(event)
+        with gc.GoogleCalendar(token_path=cfg.TOKEN_PATH, credentials_path=cfg.CREDENTIALS_PATH) as CALENDAR:
+            success, message = CALENDAR.create_event(event)
 
         if success:
             cfg.LOGGER.info(f"Event added to Google Calendar: {item.title}: {item.scheduled_date}")
