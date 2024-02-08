@@ -5,6 +5,8 @@ from tkinter import filedialog as fd
 
 import configuration as cfg
 
+recurrence_chars = ['++', '.+']
+
 @dataclass
 class ScheduledItem:
     title: str
@@ -14,6 +16,7 @@ class ScheduledItem:
     recurrence_period: int = None
 
 def get_scheduled_in_logseq_file(file_path:Path, exclude_past = False) -> ScheduledItem:
+    remove_prefixes = ['TODO ', 'DONE ', 'LATER ']
     scheduled_items = []
 
     with open(file_path, 'r') as file:
@@ -29,13 +32,19 @@ def get_scheduled_in_logseq_file(file_path:Path, exclude_past = False) -> Schedu
 
                     scheduled_date_str = line.split('<', 1)[1].split('>', 1)[0]
                     title = lines[i-1].strip().lstrip('- ')
+    
+                    for prefix in remove_prefixes:
+                        title = title.replace(prefix, '')
+
+                    title = title.split(" #", 1)[0]
 
                     #extract reocurrence
-                    if '++' in line: 
-                        scheduled_date_str = scheduled_date_str.split('++')[0].strip()
-                        recurrence_str = line.split('++', 1)[-1].split(">")[0] #4w
-                        recurrence_period = recurrence_str[0] #4
-                        recurrence_char = recurrence_str[1] #w
+                    for char in recurrence_chars:
+                        if char in line:
+                            scheduled_date_str = scheduled_date_str.split(char)[0].strip()
+                            recurrence_str = line.split(char, 1)[-1].split(">")[0] #4w
+                            recurrence_period = recurrence_str[0] #4
+                            recurrence_char = recurrence_str[1] #w
 
                     try:
                         scheduled_date = datetime.strptime(scheduled_date_str, "%Y-%m-%d %a %H%M")
@@ -91,4 +100,4 @@ if __name__ == '__main__':
         scheduled_items.extend(get_scheduled_in_logseq_file(logseq_file))
 
     for item in scheduled_items:
-        print(item)
+        print(item.title)
