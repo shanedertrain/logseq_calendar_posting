@@ -2,7 +2,7 @@ from itertools import chain
 from datetime import datetime
 
 import logseq_handler as lh
-from google_calendar import GoogleCalendar
+import google_calendar as gc
 import configuration as cfg
 
 logseq_to_google_calendar_recocurrence_strings = {
@@ -13,7 +13,7 @@ logseq_to_google_calendar_recocurrence_strings = {
     'y': 'YEARLY'
 }
 
-CALENDAR = GoogleCalendar(token_path=cfg.TOKEN_PATH, credentials_path=cfg.CREDENTIALS_PATH)
+CALENDAR = gc.GoogleCalendar(token_path=cfg.TOKEN_PATH, credentials_path=cfg.CREDENTIALS_PATH)
 
 def format_recurrence_string(recurrence_type, recurrence_period):
     recurrence_rule = f"RRULE:FREQ={recurrence_type}"
@@ -33,13 +33,19 @@ def main():
             recurrence_type = logseq_to_google_calendar_recocurrence_strings.get(item.recurrence_char)
             recurrence_rule = format_recurrence_string(recurrence_type, item.recurrence_period)
 
-        success, message = CALENDAR.create_event(item.title, item.scheduled_date, recurrence_rule=recurrence_rule)
+        event = gc.Event(summary=item.title, 
+                         start=item.scheduled_date,
+                         recurrence=[ recurrence_rule ] if recurrence_rule is not None else None,
+                         reminders={'useDefault': False, 'overrides': [{'method': 'popup', 'minutes': 10}]})
+
+        success, message = CALENDAR.create_event(event)
 
         if success:
             cfg.LOGGER.info(f"Event added to Google Calendar: {item.title}: {item.scheduled_date}")
         else:
-            cfg.LOGGER.error(f"Error adding event to Google Calendar: {item.title}: {item.scheduled_date}\n{message}")
-        pass
+            if "Not adding duplicate." not in message:
+                cfg.LOGGER.error(f"Error adding event to Google Calendar: {item.title}: {item.scheduled_date}\n{message}")
+            pass
 
 if __name__ == '__main__':
     main()

@@ -41,7 +41,7 @@ def configure_logger(log_file) -> logging.Logger:
 
     # Create stream handler to log messages to the console
     console_handler = MStreamHandler()
-    console_handler.setLevel(logging.INFO)  # Change the level as needed
+    console_handler.setLevel(logging.DEBUG)  # Change the level as needed
 
     # Create a formatter and set it to the handler
     formatter = logging.Formatter('[%(levelname)s] %(asctime)s: %(filename)s | %(message)s', '%H:%M:%S')
