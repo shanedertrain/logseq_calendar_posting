@@ -1,8 +1,6 @@
 from itertools import chain
-from datetime import datetime
-
 import logseq_handler as lh
-import google_calendar as gc
+import google_service as gs
 import configuration as cfg
 
 logseq_to_google_calendar_recocurrence_strings = {
@@ -12,6 +10,9 @@ logseq_to_google_calendar_recocurrence_strings = {
     'm': 'MONTHLY',
     'y': 'YEARLY'
 }
+
+EVENT = 'EVENT'
+TASK = 'TASK'
 
 def format_recurrence_string(recurrence_type, recurrence_period):
     recurrence_rule = f"RRULE:FREQ={recurrence_type}"
@@ -25,26 +26,33 @@ def main():
     logseq_files = lh.return_list_of_markdown_files_in_dir(cfg.LOGSEQ_FOLDER_PATH)
     scheduled_items:list[lh.ScheduledItem] = list(chain.from_iterable(lh.get_scheduled_in_logseq_file(file, exclude_past=True) for file in logseq_files))
 
-    for item in scheduled_items:
-        recurrence_rule = None
-        if item.recurrence_char is not None:
-            recurrence_type = logseq_to_google_calendar_recocurrence_strings.get(item.recurrence_char)
-            recurrence_rule = format_recurrence_string(recurrence_type, item.recurrence_period)
+    with gs.GoogleService(token_path=cfg.TOKEN_PATH, credentials_path=cfg.CREDENTIALS_PATH) as SERVICE:
+        for item in scheduled_items:
+            recurrence_rule = None
 
-        event = gc.Event(summary=item.title, 
-                         start=item.scheduled_date,
-                         recurrence=[ recurrence_rule ] if recurrence_rule is not None else None,
-                         reminders={'useDefault': False, 'overrides': [{'method': 'popup', 'minutes': 10}]})
+            if item.recurrence_char is not None:
+                recurrence_type = logseq_to_google_calendar_recocurrence_strings.get(item.recurrence_char)
+                recurrence_rule = format_recurrence_string(recurrence_type, item.recurrence_period)
 
-        with gc.GoogleCalendar(token_path=cfg.TOKEN_PATH, credentials_path=cfg.CREDENTIALS_PATH) as CALENDAR:
-            success, message = CALENDAR.create_event(event)
+            event_type = EVENT if item.has_time == True else TASK
+            
+            if event_type in [EVENT]:
+                event = gs.Event(summary=item.title, 
+                            start=item.scheduled_date,
+                            recurrence=[ recurrence_rule ] if recurrence_rule is not None else None,
+                            reminders={'useDefault': False, 'overrides': [{'method': 'popup', 'minutes': 10}]})
+                success, message = SERVICE.create_event(event)
+            elif event_type in [TASK]:
+                task = gs.Task(title=item.title,
+                            due=item.scheduled_date.strftime(gs.FMT_DATETIME_RFC3339))
+                tasklist = SERVICE.get_tasklist()
 
-        if success:
-            cfg.LOGGER.info(f"Event added to Google Calendar: {item.title}: {item.scheduled_date}")
-        else:
-            if "Not adding duplicate." not in message:
-                cfg.LOGGER.error(f"Error adding event to Google Calendar: {item.title}: {item.scheduled_date}\n{message}")
-            pass
+                tasks_in_tasklist = SERVICE.get_tasks(tasklist)
+                if task.title not in [item['title'] for item in tasks_in_tasklist]:
+                    success, message = SERVICE.insert_task(tasklist, task)
+                else:
+                    cfg.LOGGER.debug(f"Task already exists in calendar: {item.title}")
+                
 
 if __name__ == '__main__':
     main()
