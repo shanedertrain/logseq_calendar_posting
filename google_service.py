@@ -4,6 +4,7 @@ from datetime import datetime
 from dataclasses import dataclass, asdict
 from typing import List, Optional, Union
 from pathlib import Path
+from google.auth.transport.requests import Request
 
 from googleapiclient.errors import HttpError
 
@@ -65,7 +66,8 @@ class Task:
 class GoogleService:
     scopes = ['https://www.googleapis.com/auth/tasks.readonly',
             'https://www.googleapis.com/auth/tasks',
-            'https://www.googleapis.com/auth/calendar']
+            'https://www.googleapis.com/auth/calendar',
+            'offline']
     tasks_api = ('tasks', 'v1')
     calendar_api = ('calendar', 'v3')
 
@@ -82,9 +84,10 @@ class GoogleService:
         self.service_tasks.close()
         self.service_calendar.close()
 
-    def authenticate(self, credentials_path: Path, scopes:list[str]):
+    def authenticate(self, credentials_path: Path, scopes: List[str]):
         flow = InstalledAppFlow.from_client_secrets_file(credentials_path, scopes)
         creds = flow.run_local_server(port=0)
+
         return creds
 
     def initialize_service(self, api_name:str, api_version:int, scopes:list[str]):
@@ -95,6 +98,14 @@ class GoogleService:
         except Exception as e:
             cfg.LOGGER.error(f'Error loading credentials: {e}')
 
+        if not creds or not creds.valid:
+            if creds and creds.expired and creds.refresh_token:
+                # If credentials have a refresh token, refresh the access token
+                creds.refresh(Request())
+            else:
+                # If no valid credentials or refresh token, perform the OAuth flow
+                self.authenticate(self.credentials_path, scopes)
+        
         if not creds or not creds.valid:
             creds = self.authenticate(self.credentials_path, scopes)
             with open(self.token_path, 'w') as token:

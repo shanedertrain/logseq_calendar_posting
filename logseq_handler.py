@@ -56,7 +56,7 @@ def get_scheduled_in_logseq_file(file_path:Path, exclude_past = False) -> Schedu
 
                     has_time = scheduled_date.time() != datetime.min.time()
 
-                    if exclude_past and scheduled_date < datetime.now()-timedelta(days=1):
+                    if exclude_past and scheduled_date < datetime.now()-timedelta(days=2):
                         continue
 
                     scheduled_items.append(ScheduledItem(title=title, 
